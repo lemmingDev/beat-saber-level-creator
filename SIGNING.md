@@ -125,6 +125,36 @@ Apple does run a **fee waiver** programme for non-profits, accredited
 educational institutions and government entities — worth applying for if the
 project qualifies.
 
+## Windows — free signing via SignPath (wired up)
+
+The repository is public, so it qualifies for the free SignPath Foundation
+programme. `.github/workflows/signpath-windows.yml` is ready and stays dormant
+until you enable it.
+
+### One-time setup
+
+1. Apply at <https://signpath.org/> (free for open-source projects, manual approval).
+2. In the SignPath portal create:
+   - an **Organisation**
+   - a **Project** linked to this GitHub repo
+   - a **Signing Policy** (e.g. `release-signing`)
+   - an **Artifact Configuration** whose root element is `<zip-file>` and which
+     contains `*.msi` and `*.exe`
+3. Install the **SignPath GitHub App** on this repository.
+4. Add secrets / variables under *Settings → Secrets and variables → Actions*:
+
+   | Kind | Name | Value |
+   |---|---|---|
+   | Secret | `SIGNPATH_API_TOKEN` | API token with submitter rights |
+   | Variable | `SIGNPATH_ORGANIZATION_ID` | organisation GUID |
+   | Variable | `SIGNPATH_PROJECT_SLUG` | e.g. `beatmapper` |
+   | Variable | `SIGNPATH_SIGNING_POLICY_SLUG` | e.g. `release-signing` |
+   | Variable | `SIGNPATH_ARTIFACT_CONFIG_SLUG` | e.g. `windows-installers` |
+   | Variable | `SIGNPATH_ENABLED` | `true` |
+
+5. Push a tag. The job builds Windows, has the installers signed, and replaces
+   the unsigned `.msi`/`.exe` on the release with signed ones.
+
 ## Windows — free signing for open-source projects
 
 Two services sign open-source binaries for free with a real, trusted

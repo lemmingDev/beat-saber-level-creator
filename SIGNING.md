@@ -100,3 +100,59 @@ OV certificates have to earn it over time.
 
 There is no code-signing requirement for the `.deb` or `.AppImage`. If you
 publish an APT repository later you would add a GPG key instead.
+
+---
+
+# Free options
+
+## macOS — ad-hoc signing (free)
+
+The workflow signs ad-hoc when `APPLE_SIGNING_IDENTITY` is unset, by falling
+back to `-`. This replaces the alarming *"Beatmapper is damaged and can't be
+opened"* dialog with the milder *"unidentified developer"* one, which users can
+dismiss with right-click → **Open**.
+
+Users can also clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Beatmapper.app
+```
+
+This is free but is **not** notarisation: it will never be a warning-free,
+double-clickable `.dmg`. Only a paid Developer ID plus notarisation gives that.
+
+Apple does run a **fee waiver** programme for non-profits, accredited
+educational institutions and government entities — worth applying for if the
+project qualifies.
+
+## Windows — free signing for open-source projects
+
+Two services sign open-source binaries for free with a real, trusted
+certificate:
+
+| Service | Notes |
+|---|---|
+| **SignPath Foundation** | Free for OSS; integrate via their GitHub Action |
+| **Certum Open Source Code Signing** | Free certificate for OSS, issued via SimplySign cloud |
+
+Both require the project to be **public** and openly licensed. If this fork is
+ever made public, SignPath is the path of least resistance: their action signs
+the `.msi`/`.exe` and the SmartScreen prompt disappears as reputation builds.
+
+A **self-signed** certificate is free but useless for distribution — SmartScreen
+still warns, and users would have to install your root certificate first.
+
+## Distributing without any signing
+
+Builds from source never trigger a trust prompt:
+
+```bash
+git clone https://github.com/lemmingDev/beat-saber-level-creator.git
+cd beat-saber-level-creator
+pnpm install
+pnpm exec panda codegen --clean
+pnpm tauri build
+```
+
+Requires Node 22+, pnpm 11, Rust stable with the `wasm32-unknown-unknown`
+target, and `wasm-pack`.

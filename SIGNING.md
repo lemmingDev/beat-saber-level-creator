@@ -96,6 +96,49 @@ OV certificates have to earn it over time.
 
 ---
 
+## Windows — self-signed (free, personal distribution)
+
+This is what the workflow uses by default when no paid certificate is present.
+
+### Create the certificate (once, on Windows)
+
+```powershell
+.\scripts\generate-self-signed-cert.ps1
+```
+
+Creates `beatmapper-selfsigned.pfx` and `beatmapper-selfsigned.cer`.
+
+### Add the secrets
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('beatmapper-selfsigned.pfx')) | Set-Clipboard
+```
+
+| Secret | Value |
+|---|---|
+| `WINDOWS_SELF_SIGN_PFX` | base64 of the `.pfx` |
+| `WINDOWS_SELF_SIGN_PASSWORD` | the password you chose |
+
+The workflow decodes the `.pfx`, points Tauri at `scripts/sign-windows.ps1`, and
+every installer is signed with `signtool` and verified.
+
+### What users see
+
+| Situation | Result |
+|---|---|
+| Certificate **not** trusted on their machine | *"Unknown publisher"* + SmartScreen prompt (same as unsigned) |
+| Certificate **trusted** on their machine | No publisher warning; installs cleanly |
+
+To trust it, the user runs once in an **admin** PowerShell:
+
+```powershell
+certutil -addstore -f Root beatmapper-selfsigned.cer
+```
+
+That is the whole benefit of self-signing: it cannot remove the warning for
+strangers, but it removes it for anyone who installs your `.cer` — which is
+enough for your own machines and a few friends.
+
 ## Linux
 
 There is no code-signing requirement for the `.deb` or `.AppImage`. If you

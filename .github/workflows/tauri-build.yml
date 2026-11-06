@@ -1,10 +1,14 @@
 name: Build Desktop App
 
+# Manual only: start a run from the Actions tab ("Run workflow").
+# Nothing is built on push, so tags and commits never spend build minutes.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
+    inputs:
+      tag:
+        description: "Release tag to create or update (e.g. v0.1.2)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -35,6 +39,10 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # --- Windows self-signed certificate (free, optional) ----------------
+      WINDOWS_SELF_SIGN_PFX: ${{ secrets.WINDOWS_SELF_SIGN_PFX }}
+      WINDOWS_SELF_SIGN_PASSWORD: ${{ secrets.WINDOWS_SELF_SIGN_PASSWORD }}
 
       # --- Windows signing via Azure Trusted Signing (optional) ------------
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -97,27 +105,43 @@ jobs:
       - name: Generate PandaCSS styles
         run: pnpm exec panda codegen --clean
 
-      # Wire Authenticode signing for Windows when Azure Trusted Signing
-      # credentials are configured. Patches the config just for this runner.
+      # Configure Authenticode signing for Windows.
+      # Prefers a self-signed certificate (free) and falls back to Azure
+      # Trusted Signing when those credentials are present instead.
       - name: Configure Windows signing
-        if: matrix.platform == 'windows-latest' && env.AZURE_TS_ENDPOINT != ''
+        if: matrix.platform == 'windows-latest' && (env.WINDOWS_SELF_SIGN_PFX != '' || env.AZURE_TS_ENDPOINT != '')
         shell: pwsh
         run: |
-          cargo install trusted-signing-cli --locked
           $cfg = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+
+          if ($env:WINDOWS_SELF_SIGN_PFX) {
+            Write-Host "Using self-signed certificate"
+            $pfx = Join-Path $env:RUNNER_TEMP 'beatmapper-selfsigned.pfx'
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_SELF_SIGN_PFX))
+            "WINDOWS_SELF_SIGN_PFX_PATH=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $script = Join-Path $env:GITHUB_WORKSPACE 'scripts/sign-windows.ps1'
+            $signCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File `"$script`" %1"
+          }
+          else {
+            Write-Host "Using Azure Trusted Signing"
+            cargo install trusted-signing-cli --locked
+            $signCommand = "trusted-signing-cli -e $env:AZURE_TS_ENDPOINT -a $env:AZURE_TS_ACCOUNT -c $env:AZURE_TS_PROFILE -d Beatmapper %1"
+          }
+
           $cfg.bundle | Add-Member -NotePropertyName windows -NotePropertyValue ([pscustomobject]@{
             digestAlgorithm = "sha256"
-            timestampUrl    = "http://timestamp.acs.microsoft.com"
-            signCommand     = "trusted-signing-cli -e $env:AZURE_TS_ENDPOINT -a $env:AZURE_TS_ACCOUNT -c $env:AZURE_TS_PROFILE -d Beatmapper %1"
+            timestampUrl    = "http://timestamp.digicert.com"
+            signCommand     = $signCommand
           }) -Force
           $cfg | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json
+          Write-Host "signCommand = $signCommand"
 
       - name: Build and bundle
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__
+          tagName: ${{ inputs.tag || 'v__VERSION__' }}
           releaseName: 'Beatmapper v__VERSION__'
           releaseBody: |
             Desktop builds of Beatmapper.

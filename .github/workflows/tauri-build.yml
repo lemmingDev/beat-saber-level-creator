@@ -28,18 +28,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     env:
-      # --- macOS signing + notarisation (optional) -------------------------
-      # When these secrets are present Tauri signs and notarises the .app/.dmg
-      # automatically. When absent the build is unsigned (Gatekeeper warns).
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      # Falls back to an ad-hoc signature when no certificate is configured,
-      # which avoids the misleading "app is damaged" Gatekeeper dialog.
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
       # --- Windows self-signed certificate (free, optional) ----------------
       WINDOWS_SELF_SIGN_PFX: ${{ secrets.WINDOWS_SELF_SIGN_PFX }}
       WINDOWS_SELF_SIGN_PASSWORD: ${{ secrets.WINDOWS_SELF_SIGN_PASSWORD }}
@@ -108,6 +96,35 @@ jobs:
       # Configure Authenticode signing for Windows.
       # Prefers a self-signed certificate (free) and falls back to Azure
       # Trusted Signing when those credentials are present instead.
+      # Only define the APPLE_* variables when a certificate secret exists.
+      # An empty APPLE_CERTIFICATE makes Tauri attempt a PKCS#12 import and
+      # fail, so ad-hoc signing is selected explicitly instead.
+      - name: Configure macOS signing
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          CERT: ${{ secrets.APPLE_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD_SECRET: ${{ secrets.APPLE_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$CERT" ]; then
+            {
+              echo "APPLE_CERTIFICATE=$CERT"
+              echo "APPLE_CERTIFICATE_PASSWORD=$CERT_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$IDENTITY"
+              echo "APPLE_ID=$APPLE_ID_SECRET"
+              echo "APPLE_PASSWORD=$APPLE_PASSWORD_SECRET"
+              echo "APPLE_TEAM_ID=$TEAM_ID"
+            } >> "$GITHUB_ENV"
+            echo "Signing with Developer ID and notarising."
+          else
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "No certificate configured: using an ad-hoc signature."
+          fi
+
       - name: Configure Windows signing
         if: matrix.platform == 'windows-latest' && (env.WINDOWS_SELF_SIGN_PFX != '' || env.AZURE_TS_ENDPOINT != '')
         shell: pwsh

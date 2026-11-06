@@ -71,6 +71,11 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      # PandaCSS generates `styled-system`, which every component imports.
+      # It is gitignored, so it must be regenerated before any build.
+      - name: Generate PandaCSS styles
+        run: pnpm exec panda codegen --clean
+
       - name: Build and bundle
         uses: tauri-apps/tauri-action@v0
         env:

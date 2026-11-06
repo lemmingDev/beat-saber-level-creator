@@ -23,6 +23,25 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
 
+    env:
+      # --- macOS signing + notarisation (optional) -------------------------
+      # When these secrets are present Tauri signs and notarises the .app/.dmg
+      # automatically. When absent the build is unsigned (Gatekeeper warns).
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # --- Windows signing via Azure Trusted Signing (optional) ------------
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TS_ENDPOINT: ${{ secrets.AZURE_TS_ENDPOINT }}
+      AZURE_TS_ACCOUNT: ${{ secrets.AZURE_TS_ACCOUNT }}
+      AZURE_TS_PROFILE: ${{ secrets.AZURE_TS_PROFILE }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,6 +94,21 @@ jobs:
       # It is gitignored, so it must be regenerated before any build.
       - name: Generate PandaCSS styles
         run: pnpm exec panda codegen --clean
+
+      # Wire Authenticode signing for Windows when Azure Trusted Signing
+      # credentials are configured. Patches the config just for this runner.
+      - name: Configure Windows signing
+        if: matrix.platform == 'windows-latest' && env.AZURE_TS_ENDPOINT != ''
+        shell: pwsh
+        run: |
+          cargo install trusted-signing-cli --locked
+          $cfg = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $cfg.bundle | Add-Member -NotePropertyName windows -NotePropertyValue ([pscustomobject]@{
+            digestAlgorithm = "sha256"
+            timestampUrl    = "http://timestamp.acs.microsoft.com"
+            signCommand     = "trusted-signing-cli -e $env:AZURE_TS_ENDPOINT -a $env:AZURE_TS_ACCOUNT -c $env:AZURE_TS_PROFILE -d Beatmapper %1"
+          }) -Force
+          $cfg | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json
 
       - name: Build and bundle
         uses: tauri-apps/tauri-action@v0

@@ -34,7 +34,7 @@ function EditorSongInfo({ showDifficultySelector }: Props) {
 	const BEATMAP_LIST_COLLECTION = useMemo(() => {
 		return createListCollection({
 			items: Object.keys(beatmaps),
-			itemToString: (beatmapId) => beatmaps[beatmapId].customLabel ?? beatmapId,
+			itemToString: (beatmapId) => beatmaps[beatmapId].customLabel || beatmapId,
 		});
 	}, [beatmaps]);
 

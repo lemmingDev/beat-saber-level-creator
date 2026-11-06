@@ -42,7 +42,7 @@ function Beatmaps({ songId }: Props) {
 
 	const { collection } = useListCollection({
 		initialItems: Object.keys(beatmaps),
-		itemToString: (beatmapId) => beatmaps[beatmapId].customLabel ?? beatmapId,
+		itemToString: (beatmapId) => beatmaps[beatmapId].customLabel || beatmapId,
 	});
 
 	return <Select collection={collection} value={[selectedBeatmap.toString()]} onValueChange={(details) => dispatch(updateSelectedBeatmap({ songId, beatmapId: details.value[0] }))} />;

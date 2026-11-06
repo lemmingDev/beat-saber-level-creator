@@ -21,3 +21,4 @@ dist
 
 # misc
 .DS_Store
+wasm/target

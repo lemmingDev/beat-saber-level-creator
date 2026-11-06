@@ -7,6 +7,8 @@ import { default as velite } from "@velite/plugin-vite";
 import { default as react } from "@vitejs/plugin-react";
 import { defineConfig, type UserConfig } from "vite";
 import { VitePWA, type VitePWAOptions } from "vite-plugin-pwa";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 
 import packageJson from "./package.json" with { type: "json" };
 
@@ -71,7 +73,7 @@ export default defineConfig(async (ctx) => {
 		},
 		workbox: {
 			globPatterns: ["**/*"],
-			maximumFileSizeToCacheInBytes: 20971520, // 20 MB
+			maximumFileSizeToCacheInBytes: 52428800, // 50 MB
 		},
 	};
 
@@ -87,7 +89,14 @@ export default defineConfig(async (ctx) => {
 	}
 
 	return {
-		plugins: [devtools(DEVTOOLS_OPTIONS), react(), VitePWA(PWA_OPTIONS), tanstackRouter(TSR_OPTIONS), velite()],
+		plugins: [
+			devtools(DEVTOOLS_OPTIONS),
+			wasm(),
+			react(),
+			VitePWA(PWA_OPTIONS),
+			tanstackRouter(TSR_OPTIONS),
+			velite(),
+		],
 		assetsInclude: ["**/*.glsl"],
 		define: {
 			version: `"${version}"`,
@@ -119,6 +128,12 @@ export default defineConfig(async (ctx) => {
 		css: {
 			postcss: {
 				plugins: [pandacss({})],
+			},
+		},
+		server: {
+			headers: {
+				"Cross-Origin-Opener-Policy": "same-origin",
+				"Cross-Origin-Embedder-Policy": "require-corp",
 			},
 		},
 	} as UserConfig;

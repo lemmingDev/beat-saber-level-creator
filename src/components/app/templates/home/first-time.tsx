@@ -11,6 +11,13 @@ import { selectSongIds } from "$/store/selectors";
 import { styled, VStack, Wrap } from "$:styled-system/jsx";
 import OptionColumn from "./option";
 
+const SAMPLE_MAPS = [
+	{ name: "Beat It (MJ)", url: "/maps/beat_it_mj.zip" },
+	{ name: "Billie Jean (MJ)", url: "/maps/billie_jean.zip" },
+	{ name: "Bohemian Like You", url: "/maps/bohemian_like_you.zip" },
+	{ name: "CALAMITY RHAPSODY", url: "/maps/calamity_rhapsody.zip" },
+];
+
 function FirstTimeHome() {
 	const dispatch = useAppDispatch();
 	const songIds = useAppSelector(selectSongIds);
@@ -18,6 +25,7 @@ function FirstTimeHome() {
 	const navigate = useNavigate();
 
 	const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+	const [loadingSample, setLoadingSample] = useState<string | null>(null);
 
 	const handleDemoClick = useCallback(async () => {
 		setIsLoadingDemo(true);
@@ -25,6 +33,19 @@ function FirstTimeHome() {
 		const { songId, beatmapId } = await dispatch(addSongFromFile({ file, options: { readonly: true } })).unwrap();
 		navigate({ to: "/edit/$sid/$bid/notes", params: { sid: songId.toString(), bid: beatmapId.toString() } });
 		setIsLoadingDemo(false);
+	}, [dispatch, navigate]);
+
+	const handleLoadSample = useCallback(async (map: { name: string; url: string }) => {
+		setLoadingSample(map.name);
+		try {
+			const file = await fetch(map.url).then((response) => response.blob());
+			const { songId, beatmapId } = await dispatch(addSongFromFile({ file, options: { readonly: true } })).unwrap();
+			navigate({ to: "/edit/$sid/$bid/notes", params: { sid: songId.toString(), bid: beatmapId.toString() } });
+		} catch (err) {
+			console.error("Failed to load sample map:", JSON.stringify(err), err);
+		} finally {
+			setLoadingSample(null);
+		}
 	}, [dispatch, navigate]);
 
 	return (
@@ -55,6 +76,14 @@ function FirstTimeHome() {
 							</Button>
 						</Dialog>
 					</OptionColumn>
+				</Wrap>
+				<Heading rank={3}>Or try a sample map</Heading>
+				<Wrap gap={4}>
+					{SAMPLE_MAPS.map((map) => (
+						<Button key={map.name} variant="subtle" size="md" loading={loadingSample === map.name} onClick={() => handleLoadSample(map)}>
+							{map.name}
+						</Button>
+					))}
 				</Wrap>
 			</VStack>
 		</VStack>

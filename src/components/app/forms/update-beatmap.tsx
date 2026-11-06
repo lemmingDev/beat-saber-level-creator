@@ -127,7 +127,7 @@ function UpdateBeatmapForm({ bid }: Props) {
 				<Stack gap={1}>
 					<Heading rank={3}>
 						<RouterLink to={`/edit/$sid/$bid/${view}`} params={{ sid: sid.toString(), bid: bid.toString() }} className={css({ fontWeight: 300, color: "fg.muted" })}>
-							{savedVersion.customLabel ?? bid}
+							{savedVersion.customLabel || bid}
 						</RouterLink>
 					</Heading>
 					<HStack gap={0}>

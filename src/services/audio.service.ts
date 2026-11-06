@@ -64,6 +64,11 @@ export class AudioSample {
 	play(startTime?: number, duration?: number, onFinished?: () => void) {
 		if (!this.#buffer) return;
 
+		// Resume audio context if suspended (required by Tauri webview / browsers)
+		if (this.#context.state === "suspended") {
+			this.#context.resume().catch(() => {});
+		}
+
 		if (this.isPlaying) {
 			this.pause();
 		}

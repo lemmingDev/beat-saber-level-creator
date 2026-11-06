@@ -5,12 +5,14 @@ import { useState } from "react";
 import { array, endsWith, file, type GenericSchema, gtValue, length, maxLength, minLength, minValue, number, object, pipe, string, transform } from "valibot";
 
 import { CHARACTERISTIC_COLLECTION, COVER_ART_FILE_ACCEPT_TYPE, DIFFICULTY_COLLECTION, ENVIRONMENT_COLLECTION, SONG_FILE_ACCEPT_TYPE } from "$/components/app/constants";
-import { useToaster } from "$/components/context";
+import { useAudioContext, useToaster } from "$/components/context";
 import { Show } from "$/components/ui/atoms";
-import { Audio, Switch, useAppForm } from "$/components/ui/compositions";
+import { Audio, Button, Switch, useAppForm } from "$/components/ui/compositions";
 import { createPlaceholderImageFile, remuxImageToSquare } from "$/helpers/file.helpers";
+import { decodeAudioData } from "$/helpers/audio.helpers";
 import { createSongId, resolveBeatmapId } from "$/helpers/song.helpers";
 import { addSong } from "$/store/actions";
+import { useWasmAudio } from "$/hooks/useWasmAudio";
 import { useAppDispatch, useAppSelector } from "$/store/hooks";
 import { selectSongIds, selectSongVolume, selectUsername } from "$/store/selectors";
 
@@ -41,8 +43,84 @@ function CreateMapForm({ dialog }: Props) {
 	const currentSongIds = useAppSelector(selectSongIds);
 	const username = useAppSelector(selectUsername);
 	const volume = useAppSelector(selectSongVolume);
+	const audioContext = useAudioContext();
 
 	const toaster = useToaster();
+
+	const { isReady, analyzeAudio } = useWasmAudio();
+	const [isDetectingBpm, setIsDetectingBpm] = useState(false);
+	const [bpmConfidence, setBpmConfidence] = useState<number | null>(null);
+	const [enableBpmSnapping, setEnableBpmSnapping] = useState(true);
+
+	const detectBpm = async (songFile: File) => {
+		if (!isReady || !songFile) return;
+		setIsDetectingBpm(true);
+		setBpmConfidence(null);
+		try {
+			const audioBuffer = await decodeAudioData(songFile, audioContext);
+
+			// Analyze middle 80% of the song for BPM (ignores intro/outro/silence)
+			const startSample = Math.floor(audioBuffer.length * 0.1);
+			const endSample = Math.floor(audioBuffer.length * 0.9);
+			const middleBuffer = audioContext.createBuffer(
+				audioBuffer.numberOfChannels,
+				endSample - startSample,
+				audioBuffer.sampleRate
+			);
+			for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+				const src = audioBuffer.getChannelData(ch);
+				const dst = middleBuffer.getChannelData(ch);
+				for (let i = 0; i < dst.length; i++) {
+					dst[i] = src[startSample + i];
+				}
+			}
+
+			const analysis = await analyzeAudio(middleBuffer);
+			if (analysis && analysis.tempo) {
+				let detectedBpm = analysis.tempo;
+				// Snap to nearest integer if enabled and very close (most songs are at integer BPMs)
+				if (enableBpmSnapping) {
+					const nearestInt = Math.round(detectedBpm);
+					if (Math.abs(detectedBpm - nearestInt) < 0.3) {
+						detectedBpm = nearestInt;
+					}
+				}
+				Form.setFieldValue("bpm", Math.round(detectedBpm * 10) / 10);
+				setBpmConfidence(analysis.tempo_confidence ?? null);
+
+				// Detect lead-in from full audio (first significant onset)
+				const fullAnalysis = await analyzeAudio(audioBuffer);
+				const leadIn = fullAnalysis ? detectLeadIn(fullAnalysis) : null;
+				if (leadIn !== null) {
+					Form.setFieldValue("offset", Math.round(leadIn * 100) / 100);
+				}
+
+				toaster.success({ description: `Detected BPM: ${detectedBpm.toFixed(1)} (confidence: ${((analysis.tempo_confidence ?? 0) * 100).toFixed(0)}%)${leadIn !== null ? `, Lead-in: ${leadIn.toFixed(2)}s` : ""}` });
+			} else {
+				toaster.error({ description: "Could not detect BPM from audio" });
+			}
+		} catch (err) {
+			toaster.error({ description: `BPM detection failed: ${err instanceof Error ? err.message : "Unknown error"}` });
+		} finally {
+			setIsDetectingBpm(false);
+		}
+	};
+
+	const detectLeadIn = (analysis: any): number | null => {
+		// Find the first onset with significant strength (> 0.3)
+		const onsets = analysis.onsets || [];
+		if (onsets.length === 0) return null;
+
+		const significantOnsets = onsets.filter((o: any) => o.strength > 0.3);
+		if (significantOnsets.length === 0) return null;
+
+		const firstOnset = significantOnsets[0];
+		// If first onset is more than 0.5s into the song, there is lead-in
+		if (firstOnset.time > 0.5) {
+			return firstOnset.time;
+		}
+		return null;
+	};
 
 	const Form = useAppForm({
 		defaultValues: {
@@ -109,6 +187,7 @@ function CreateMapForm({ dialog }: Props) {
 			}
 		},
 	});
+	const songFile = useStore(Form.store, (state) => state.values.songFile);
 
 	const previewStartTime = useStore(Form.store, (state) => state.values.previewStartTime);
 	const previewDuration = useStore(Form.store, (state) => state.values.previewDuration);
@@ -131,6 +210,27 @@ function CreateMapForm({ dialog }: Props) {
 					<Form.Row>
 						<Form.AppField name="name">{(ctx) => <ctx.Input label="Song Title" required />}</Form.AppField>
 						<Form.AppField name="bpm">{(ctx) => <ctx.NumberInput label="BPM (Beats per Minute)" min={0} required />}</Form.AppField>
+					</Form.Row>
+					<Form.Row>
+						<Button variant="subtle" size="sm" loading={isDetectingBpm} disabled={!isReady || !(songFile?.[0])} onClick={() => {
+							const file = songFile?.[0];
+							if (file) detectBpm(file);
+						}}>
+							{isDetectingBpm ? "Detecting..." : "Detect BPM from Audio"}
+						</Button>
+						<label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--fg-muted)" }}>
+							<input
+								type="checkbox"
+								checked={enableBpmSnapping}
+								onChange={(e) => setEnableBpmSnapping(e.target.checked)}
+							/>
+							Snap to integer BPM
+						</label>
+						{bpmConfidence !== null && (
+							<span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+								Confidence: {(bpmConfidence * 100).toFixed(0)}%
+							</span>
+						)}
 					</Form.Row>
 				</Show>
 				<Show when={showOptionalFields}>
@@ -158,6 +258,20 @@ function CreateMapForm({ dialog }: Props) {
 					</Form.Row>
 					<Form.Row>
 						<Form.AppField name="bpm">{(ctx) => <ctx.NumberInput label="BPM (Beats per Minute)" required min={0} />}</Form.AppField>
+						<Button variant="subtle" size="sm" loading={isDetectingBpm} disabled={!isReady || !(songFile?.[0])} onClick={() => {
+							const file = songFile?.[0];
+							if (file) detectBpm(file);
+						}}>
+							{isDetectingBpm ? "Detecting..." : "Detect BPM"}
+						</Button>
+						<label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--fg-muted)" }}>
+							<input
+								type="checkbox"
+								checked={enableBpmSnapping}
+								onChange={(e) => setEnableBpmSnapping(e.target.checked)}
+							/>
+							Snap
+						</label>
 						<Form.AppField name="offset">{(ctx) => <ctx.NumberInput label="Editor Offset" required />}</Form.AppField>
 						<Form.AppField name="previewStartTime">{(ctx) => <ctx.NumberInput label="Preview start time" required min={0} />}</Form.AppField>
 						<Form.AppField name="previewDuration">{(ctx) => <ctx.NumberInput label="Preview duration" required min={0} />}</Form.AppField>

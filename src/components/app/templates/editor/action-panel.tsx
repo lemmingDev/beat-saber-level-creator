@@ -7,7 +7,16 @@ import { useUpdateEffect } from "$/components/hooks/use-update-effect";
 import { Match, Switch } from "$/components/ui/atoms";
 import { useAppSelector } from "$/store/hooks";
 import { selectAllSelectedBombNotes, selectAllSelectedColorNotes, selectAllSelectedObstacles, selectModuleEnabled } from "$/store/selectors";
-import { DefaultActionPanelGroup, GridActionPanelGroup, GridPresetsActionPanelGroup, NoteDirectionActionPanelGroup, NoteToolActionPanelGroup, ObstaclesActionPanelGroup, SelectionActionPanelGroup } from "./action-panel-groups";
+import { 
+	DefaultActionPanelGroup, 
+	GridActionPanelGroup, 
+	GridPresetsActionPanelGroup, 
+	NoteDirectionActionPanelGroup, 
+	NoteToolActionPanelGroup, 
+	ObstaclesActionPanelGroup, 
+	SelectionActionPanelGroup,
+	AiSuggestActionPanelGroup
+} from "./action-panel-groups";
 
 function EditorActionPanel() {
 	const { sid } = useParams({ from: "/_/edit/$sid/$bid/_" });
@@ -45,6 +54,7 @@ function EditorActionPanel() {
 					<NoteToolActionPanelGroup />
 					<NoteDirectionActionPanelGroup />
 					<DefaultActionPanelGroup handleGridConfigClick={() => setShowGridConfig(true)} />
+					<AiSuggestActionPanelGroup />
 				</Match>
 				<Match when={isAnythingSelected}>
 					<SelectionActionPanelGroup />

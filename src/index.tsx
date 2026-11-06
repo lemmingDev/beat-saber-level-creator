@@ -29,34 +29,45 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-await AppStore.setup({
-	extraArgument: {
-		getRouter: () => router,
-		getFilestore: AppFilestore.setup({ driver: createAppFileStorageDriver({ name: "entries" }) }),
-		getToaster: AppToaster.setup({ placement: "bottom-end", overlap: true, max: 8 }),
-		getAudioContext: AppAudioContext.setup({}),
-	},
-});
+async function initApp() {
+	console.log('[DEBUG] Setting up AppStore...');
+	await AppStore.setup({
+		extraArgument: {
+			getRouter: () => router,
+			getFilestore: AppFilestore.setup({ driver: createAppFileStorageDriver({ name: "entries" }) }),
+			getToaster: AppToaster.setup({ placement: "bottom-end", overlap: true, max: 8 }),
+			getAudioContext: AppAudioContext.setup({}),
+		},
+	});
+	console.log('[DEBUG] AppStore setup complete');
 
-const root = document.getElementById("root");
+	const root = document.getElementById("root");
 
-if (!root) {
-	throw new Error("No root element.");
+	if (!root) {
+		throw new Error("No root element.");
+	}
+
+	console.log('[DEBUG] Rendering React app...');
+	createRoot(root).render(
+		<BeatmapFilestoreProvider value={AppFilestore.instance}>
+			<ToasterProvider value={AppToaster.instance}>
+				<AudioContextProvider value={AppAudioContext.instance}>
+					<Provider store={AppStore.instance}>
+						<QueryClientProvider client={new QueryClient()}>
+							<RouterProvider router={router} />
+						</QueryClientProvider>
+					</Provider>
+				</AudioContextProvider>
+			</ToasterProvider>
+		</BeatmapFilestoreProvider>,
+	);
+	console.log('[DEBUG] React app rendered');
 }
 
-createRoot(root).render(
-	<BeatmapFilestoreProvider value={AppFilestore.instance}>
-		<ToasterProvider value={AppToaster.instance}>
-			<AudioContextProvider value={AppAudioContext.instance}>
-				<Provider store={AppStore.instance}>
-					<QueryClientProvider client={new QueryClient()}>
-						<RouterProvider router={router} />
-					</QueryClientProvider>
-				</Provider>
-			</AudioContextProvider>
-		</ToasterProvider>
-	</BeatmapFilestoreProvider>,
-);
+initApp().catch((err) => {
+	console.error('[DEBUG] Init error:', err);
+	document.getElementById("root").innerHTML = `<pre style="color: red; padding: 20px;">${err.stack}</pre>`;
+});
 
 const updateSW = registerSW({
 	onNeedRefresh() {

@@ -53,7 +53,7 @@ export function createAppSong(data: RequiredKeys<Partial<App.ISong>, "name" | "b
 		demo: data.demo,
 		modSettings: data.modSettings ?? {
 			customColors: { isEnabled: false },
-			mappingExtensions: { isEnabled: false },
+			mappingExtensions: { isEnabled: true },  // Changed default to true
 		},
 	} as App.ISong;
 }

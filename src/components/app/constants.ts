@@ -7,7 +7,7 @@ import { nonEmpty, null_, number, object, pipe, regex, string, union } from "val
 import { createPromptFactory } from "$/components/ui/compositions";
 import type { App } from "$/types";
 
-export const SONG_FILE_ACCEPT_TYPE: FileMimeType[] = ["audio/ogg", "application/ogg"];
+export const SONG_FILE_ACCEPT_TYPE: FileMimeType[] = ["audio/ogg", "application/ogg", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/flac", "audio/aac", "audio/mp4", "audio/x-m4a"];
 export const COVER_ART_FILE_ACCEPT_TYPE: FileMimeType[] = ["image/jpeg", "image/png"];
 export const MAP_ARCHIVE_FILE_ACCEPT_TYPE: FileMimeType[] = ["application/zip", "application/x-zip-compressed", "application/octet-stream"];
 

@@ -121,9 +121,11 @@ function Dropzone({ accept, label, colorPalette }: FileUploadProps) {
 		<Builder.Dropzone className={css({ colorPalette })}>
 			<Indicator accept={accept} />
 			<Builder.Label>{label ?? accept?.toString() ?? "Any File"}</Builder.Label>
-			<Button variant="subtle" size="sm">
-				Open File Picker
-			</Button>
+			<Builder.Trigger asChild>
+				<Button variant="subtle" size="sm">
+					Open File Picker
+				</Button>
+			</Builder.Trigger>
 		</Builder.Dropzone>
 	);
 }

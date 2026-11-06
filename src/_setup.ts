@@ -72,7 +72,17 @@ export const createAppFileStorageDriver = createDriver<LegacyStorageSchema & { e
 });
 
 export const AppAudioContext = createSingleton((options: Omit<AudioContextOptions, "latencyHint">) => {
-	return new AudioContext({ ...options, latencyHint: "playback" });
+	const ctx = new AudioContext({ ...options, latencyHint: "playback" });
+	// Resume audio context on user interaction (required by browsers/Tauri webview)
+	const resume = () => {
+		if (ctx.state === "suspended") {
+			ctx.resume().catch(() => {});
+		}
+	};
+	document.addEventListener("click", resume);
+	document.addEventListener("keydown", resume);
+	document.addEventListener("touchstart", resume);
+	return ctx;
 });
 
 export const AppFilestore = createSingleton((options: CreateStorageOptions) => {

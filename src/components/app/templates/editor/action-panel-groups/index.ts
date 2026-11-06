@@ -5,3 +5,4 @@ export { default as GridPresetsActionPanelGroup } from "./grid-presets";
 export { default as ObstaclesActionPanelGroup } from "./obstacles";
 export { default as SelectionActionPanelGroup } from "./selection";
 export { default as NoteToolActionPanelGroup } from "./tool";
+export { default as AiSuggestActionPanelGroup } from "./ai-suggest";

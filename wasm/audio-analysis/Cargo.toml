@@ -1,0 +1,28 @@
+[package]
+name = "beatmapper-audio-analysis"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+authors = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+beatmapper-wasm-shared = { path = "../shared" }
+wasm-bindgen = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+web-sys = { workspace = true, features = ["AudioBuffer", "console"] }
+console_error_panic_hook = { workspace = true }
+js-sys = { workspace = true }
+rubato = { workspace = true }
+hound = { workspace = true }
+realfft = { workspace = true }
+ndarray = { workspace = true }
+num-traits = { workspace = true }
+getrandom = { version = "0.2", features = ["js"] }
+rand = "0.8"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

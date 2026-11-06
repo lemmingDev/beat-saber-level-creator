@@ -1,4 +1,4 @@
-name: Build Tauri App
+name: Build Desktop App
 
 on:
   workflow_dispatch:
@@ -9,8 +9,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build (${{ matrix.platform }})
     strategy:
       fail-fast: false
       matrix:
@@ -22,29 +27,62 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
+      # Rust is needed twice: the wasm32 target compiles our audio/pattern
+      # modules via wasm-pack, and the host toolchain compiles the Tauri shell.
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
-      - name: Build Tauri App
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and bundle
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__
           releaseName: 'Beatmapper v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseBody: |
+            Desktop builds of Beatmapper.
+
+            - **Windows** — `.msi` installer or `.exe` setup
+            - **macOS** — `.dmg` disk image
+            - **Linux** — `.deb` / `.AppImage`
           releaseDraft: true
           prerelease: false
